@@ -228,7 +228,13 @@ class CloudPreferencesHostApi {
   /// With [liveSync] false, cloud values are only read back on a fresh
   /// install. With [liveSync] true (Apple platforms only), external changes
   /// are applied and reported as they arrive.
-  Future<Map<String, Object>> initialize(bool liveSync) async {
+  ///
+  /// Keys in [localOnlyKeys] are kept in a separate store that is never backed
+  /// up or synced. Stored values are moved between the stores to match.
+  Future<Map<String, Object>> initialize(
+    bool liveSync,
+    List<String> localOnlyKeys,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.flutter_cloud_preferences.CloudPreferencesHostApi.initialize$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -237,7 +243,7 @@ class CloudPreferencesHostApi {
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[liveSync],
+      <Object?>[liveSync, localOnlyKeys],
     );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
@@ -250,7 +256,8 @@ class CloudPreferencesHostApi {
         .cast<String, Object>();
   }
 
-  /// Stores [value] locally and mirrors it to the cloud.
+  /// Stores [value] locally and, unless [key] is local-only, mirrors it to the
+  /// cloud.
   Future<void> setValue(String key, Object value) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.flutter_cloud_preferences.CloudPreferencesHostApi.setValue$pigeonVar_messageChannelSuffix';

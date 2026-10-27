@@ -309,9 +309,15 @@ interface CloudPreferencesHostApi {
    * With [liveSync] false, cloud values are only read back on a fresh
    * install. With [liveSync] true (Apple platforms only), external changes
    * are applied and reported as they arrive.
+   *
+   * Keys in [localOnlyKeys] are kept in a separate store that is never backed
+   * up or synced. Stored values are moved between the stores to match.
    */
-  fun initialize(liveSync: Boolean): Map<String, Any>
-  /** Stores [value] locally and mirrors it to the cloud. */
+  fun initialize(liveSync: Boolean, localOnlyKeys: List<String>): Map<String, Any>
+  /**
+   * Stores [value] locally and, unless [key] is local-only, mirrors it to the
+   * cloud.
+   */
   fun setValue(key: String, value: Any)
   /** Removes [key] locally and from the cloud. */
   fun remove(key: String)
@@ -333,8 +339,9 @@ interface CloudPreferencesHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val liveSyncArg = args[0] as Boolean
+            val localOnlyKeysArg = args[1] as List<String>
             val wrapped: List<Any?> = try {
-              listOf(api.initialize(liveSyncArg))
+              listOf(api.initialize(liveSyncArg, localOnlyKeysArg))
             } catch (exception: Throwable) {
               MessagesPigeonUtils.wrapError(exception)
             }

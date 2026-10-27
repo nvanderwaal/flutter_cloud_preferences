@@ -10,8 +10,9 @@ import 'package:integration_test/integration_test.dart';
 
 /// Drops the Dart cache so the next [CloudPreferences.getInstance] reads every
 /// value back from the native store.
-Future<CloudPreferences> reload() {
+Future<CloudPreferences> reload({Set<String>? localOnlyKeys}) {
   CloudPreferences.setMockStore(PigeonCloudPreferencesStore());
+  CloudPreferences.configure(localOnlyKeys: localOnlyKeys ?? {});
   return CloudPreferences.getInstance();
 }
 
@@ -59,5 +60,29 @@ void main() {
 
     await (await CloudPreferences.getInstance()).clear();
     expect((await reload()).getKeys(), isEmpty);
+  });
+
+  testWidgets('keeps local-only keys and moves them when the set changes', (
+    tester,
+  ) async {
+    final prefs = await reload(localOnlyKeys: {'token'});
+    await prefs.setString('token', 'secret');
+    await prefs.setString('theme', 'dark');
+
+    var reloaded = await reload(localOnlyKeys: {'token'});
+    expect(reloaded.getString('token'), 'secret');
+    expect(reloaded.getString('theme'), 'dark');
+
+    // No longer local-only: moved back to the backed-up store.
+    reloaded = await reload();
+    expect(reloaded.getString('token'), 'secret');
+
+    // Local-only again: moved into the local-only store, which exists.
+    reloaded = await reload(localOnlyKeys: {'token', 'theme'});
+    expect(reloaded.getString('token'), 'secret');
+    expect(reloaded.getString('theme'), 'dark');
+
+    await reloaded.clear();
+    expect((await reload(localOnlyKeys: {'token'})).getKeys(), isEmpty);
   });
 }

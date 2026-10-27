@@ -9,7 +9,10 @@ import 'messages.g.dart';
 /// Swapped for [InMemoryCloudPreferencesStore] in tests.
 abstract class CloudPreferencesStore {
   /// Opens the store and returns all locally stored values.
-  Future<Map<String, Object>> initialize({required bool liveSync});
+  Future<Map<String, Object>> initialize({
+    required bool liveSync,
+    required Set<String> localOnlyKeys,
+  });
 
   /// Stores [value] under [key].
   Future<void> setValue(String key, Object value);
@@ -29,8 +32,10 @@ class PigeonCloudPreferencesStore implements CloudPreferencesStore {
   final CloudPreferencesHostApi _api = CloudPreferencesHostApi();
 
   @override
-  Future<Map<String, Object>> initialize({required bool liveSync}) =>
-      _api.initialize(liveSync);
+  Future<Map<String, Object>> initialize({
+    required bool liveSync,
+    required Set<String> localOnlyKeys,
+  }) => _api.initialize(liveSync, localOnlyKeys.toList());
 
   @override
   Future<void> setValue(String key, Object value) => _api.setValue(key, value);
@@ -62,11 +67,19 @@ class InMemoryCloudPreferencesStore implements CloudPreferencesStore {
   /// [initialize].
   bool? liveSync;
 
+  /// The `localOnlyKeys` the store was opened with, or null before
+  /// [initialize].
+  Set<String>? localOnlyKeys;
+
   final StreamController<StoreChange> _changes = StreamController.broadcast();
 
   @override
-  Future<Map<String, Object>> initialize({required bool liveSync}) async {
+  Future<Map<String, Object>> initialize({
+    required bool liveSync,
+    required Set<String> localOnlyKeys,
+  }) async {
     this.liveSync = liveSync;
+    this.localOnlyKeys = localOnlyKeys;
     return Map.of(values);
   }
 

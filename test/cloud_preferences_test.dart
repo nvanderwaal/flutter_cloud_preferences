@@ -115,20 +115,130 @@ void main() {
       expect(store.liveSync, isFalse);
     });
 
-    test('opens the store with liveSync when asked', () async {
-      final prefs = await CloudPreferences.getInstance(liveSync: true);
+    test('opens the store with the configured options', () async {
+      CloudPreferences.configure(liveSync: true, localOnlyKeys: {'token'});
+      final prefs = await CloudPreferences.getInstance();
 
       expect(prefs.liveSync, isTrue);
+      expect(prefs.localOnlyKeys, {'token'});
       expect(store.liveSync, isTrue);
+      expect(store.localOnlyKeys, {'token'});
     });
 
-    test('throws when liveSync differs from the first call', () async {
+    test('configure throws after the store was opened', () async {
+      CloudPreferences.configure(localOnlyKeys: {'token'});
       await CloudPreferences.getInstance();
 
       expect(
-        () => CloudPreferences.getInstance(liveSync: true),
+        () => CloudPreferences.configure(localOnlyKeys: {'deviceId'}),
         throwsStateError,
       );
+      expect(
+        () => CloudPreferences.configure(liveSync: true),
+        throwsStateError,
+      );
+      // The same options again are fine.
+      CloudPreferences.configure(localOnlyKeys: {'token'});
+    });
+
+    test('the last configure before opening wins', () async {
+      CloudPreferences.configure(liveSync: true);
+      CloudPreferences.configure(localOnlyKeys: {'token'});
+      final prefs = await CloudPreferences.getInstance();
+
+      expect(prefs.liveSync, isFalse);
+      expect(prefs.localOnlyKeys, {'token'});
+    });
+
+    group('deprecated liveSync parameter', () {
+      test('opens the store with liveSync', () async {
+        // ignore: deprecated_member_use_from_same_package
+        final prefs = await CloudPreferences.getInstance(liveSync: true);
+
+        expect(prefs.liveSync, isTrue);
+        expect(store.liveSync, isTrue);
+      });
+
+      test('throws when it differs from the opened store', () async {
+        await CloudPreferences.getInstance();
+
+        expect(
+          // ignore: deprecated_member_use_from_same_package
+          () => CloudPreferences.getInstance(liveSync: true),
+          throwsStateError,
+        );
+      });
+
+      test('throws when it differs from configure', () async {
+        CloudPreferences.configure();
+
+        expect(
+          // ignore: deprecated_member_use_from_same_package
+          () => CloudPreferences.getInstance(liveSync: true),
+          throwsStateError,
+        );
+      });
+    });
+  });
+
+  group('local-only keys', () {
+    test('are passed to the store, empty by default', () async {
+      final prefs = await CloudPreferences.getInstance();
+
+      expect(prefs.localOnlyKeys, isEmpty);
+      expect(store.localOnlyKeys, isEmpty);
+    });
+
+    test('are read and written like other keys', () async {
+      CloudPreferences.configure(localOnlyKeys: {'token'});
+      final prefs = await CloudPreferences.getInstance();
+
+      await prefs.setString('token', 'secret');
+      expect(prefs.getString('token'), 'secret');
+      expect(store.values['token'], 'secret');
+    });
+
+    test('are not restored or changed by live sync', () async {
+      CloudPreferences.configure(liveSync: true, localOnlyKeys: {'token'});
+      final prefs = await CloudPreferences.getInstance();
+      final restored = <CloudPreferencesRestoreEvent>[];
+      final changes = <CloudPreferencesChange>[];
+      prefs.onRestored.listen(restored.add);
+      prefs.changes.listen(changes.add);
+
+      store.emit(
+        StoreChange(
+          reason: StoreChangeReason.restored,
+          keys: ['token'],
+          values: {'token': 'other device'},
+        ),
+      );
+      store.emit(
+        StoreChange(
+          reason: StoreChangeReason.serverChange,
+          keys: ['token'],
+          values: {'token': 'other device'},
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(prefs.containsKey('token'), isFalse);
+      expect(restored, isEmpty);
+      expect(changes, isEmpty);
+    });
+
+    test('do not count towards the iCloud limits', () async {
+      CloudPreferences.setMockInitialValues({
+        for (var i = 0; i < CloudPreferencesLimits.maxKeys; i++) 'key$i': i,
+      });
+      CloudPreferences.configure(localOnlyKeys: {'token'});
+      final prefs = await CloudPreferences.getInstance();
+
+      await prefs.setBytes(
+        'token',
+        Uint8List(CloudPreferencesLimits.maxTotalBytes),
+      );
+      expect(prefs.getBytes('token'), hasLength(1 << 20));
     });
   });
 
@@ -219,7 +329,8 @@ void main() {
       CloudPreferences.setMockStore(
         store = InMemoryCloudPreferencesStore({'old': 'x'}),
       );
-      final prefs = await CloudPreferences.getInstance(liveSync: true);
+      CloudPreferences.configure(liveSync: true);
+      final prefs = await CloudPreferences.getInstance();
       final changes = <CloudPreferencesChange>[];
       prefs.changes.listen(changes.add);
 
@@ -241,7 +352,8 @@ void main() {
     test('applies changes that arrive while the store is opening', () async {
       final slow = _SlowStore();
       CloudPreferences.setMockStore(slow);
-      final opening = CloudPreferences.getInstance(liveSync: true);
+      CloudPreferences.configure(liveSync: true);
+      final opening = CloudPreferences.getInstance();
       await pumpEventQueue();
 
       slow.emit(
@@ -268,8 +380,11 @@ class _SlowStore extends InMemoryCloudPreferencesStore {
   void finishOpening() => _opened.complete();
 
   @override
-  Future<Map<String, Object>> initialize({required bool liveSync}) async {
+  Future<Map<String, Object>> initialize({
+    required bool liveSync,
+    required Set<String> localOnlyKeys,
+  }) async {
     await _opened.future;
-    return super.initialize(liveSync: liveSync);
+    return super.initialize(liveSync: liveSync, localOnlyKeys: localOnlyKeys);
   }
 }
