@@ -1,0 +1,12 @@
+## 0.1.0
+
+* First release.
+* `CloudPreferences`: key-value preferences with cached synchronous reads for
+  `String`, `bool`, `int`, `double`, `List<String>` and `Uint8List`.
+* iOS and macOS: values stored in `UserDefaults` and mirrored to iCloud
+  key-value storage; restored on a fresh install and reported on `onRestored`;
+  opt-in live sync with `changes`.
+* Android: values stored in a SharedPreferences file that Android Auto Backup
+  restores on reinstall and new devices.
+* iCloud key-value storage limits (64-byte keys, 1024 keys, 1 MB) enforced on
+  every platform.

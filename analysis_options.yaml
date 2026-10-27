@@ -1,0 +1,15 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - lib/src/messages.g.dart
+    - build/**
+    - android/**
+    - darwin/**
+    - example/**
+
+linter:
+  rules:
+    - public_member_api_docs
+    - prefer_final_locals
+    - unawaited_futures
