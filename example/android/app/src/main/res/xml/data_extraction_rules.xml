@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and higher. Debug builds keep about 55 MB of Flutter assets in
+     app_flutter/flutter_assets, which is over the 25 MB Auto Backup quota. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_flutter/flutter_assets" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_flutter/flutter_assets" />
+    </device-transfer>
+</data-extraction-rules>
