@@ -82,14 +82,17 @@ Nothing to do in a default Flutter app: Auto Backup is on unless the app turns i
 
 The user needs backup turned on in their device settings. Android runs the backup by itself, roughly once a day when the device is idle, charging and on Wi-Fi.
 
-To test a restore without waiting:
+To test a restore without waiting, use a release build. A debug build keeps about 55 MB of Flutter assets in `app_flutter/flutter_assets`, which is over the 25 MB Auto Backup limit, so Android skips the whole backup (logcat shows `Transport quota exceeded`). To test with a debug build, exclude that folder in your backup rules, as the [example app](example/android/app/src/main/res/xml) does.
 
 ```sh
+flutter run --release       # change some values in the app
 adb shell bmgr enable true
-adb shell bmgr backupnow <your.package.name>
+adb shell bmgr backupnow @pm@ <your.package.name>
 adb uninstall <your.package.name>
-flutter run   # values are restored on install
+flutter run --release       # values are restored on install
 ```
+
+`backupnow` needs `@pm@` so the package list in the backup includes your app; without it the restore skips the app.
 
 ## Usage
 
@@ -184,7 +187,7 @@ if (!prefs.containsKey('migrated')) {
 
 **Values don't come back on iOS.** Check that the iCloud capability with Key-value storage is enabled, that the device is signed into iCloud, and listen to `onRestored`, since values can arrive after launch.
 
-**Values don't come back on Android.** Check that backup is on in the device settings and that `allowBackup` is not `false`. If the app has custom backup rules, include `flutter_cloud_preferences.xml`. Use the `bmgr` commands above to force a backup.
+**Values don't come back on Android.** Check that backup is on in the device settings and that `allowBackup` is not `false`. If the app has custom backup rules, include `flutter_cloud_preferences.xml`. Use the `bmgr` commands above to force a backup. If logcat shows `Transport quota exceeded`, the app's data is over 25 MB; debug builds always are, see above.
 
 **The macOS app quits at launch.** The app has the iCloud entitlement without a matching provisioning profile. Let Xcode manage signing with your team.
 
