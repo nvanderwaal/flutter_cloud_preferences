@@ -18,7 +18,8 @@ class LocalStore(context: Context) {
     private val file = AtomicFile(File(context.noBackupFilesDir, FILE_NAME))
 
     /** Whether the store was created on this device before. */
-    val exists: Boolean = file.baseFile.exists()
+    val exists: Boolean
+        get() = file.baseFile.exists()
 
     private val json: JSONObject = load()
 
