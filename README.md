@@ -82,7 +82,7 @@ Nothing to do in a default Flutter app: Auto Backup is on unless the app turns i
 
 The user needs backup turned on in their device settings. Android runs the backup by itself, roughly once a day when the device is idle, charging and on Wi-Fi.
 
-To test a restore without waiting:
+To test a restore without waiting, run the app, change some values, leave the app running (don't stop it from the IDE), and then:
 
 ```sh
 adb shell bmgr enable true
@@ -90,6 +90,17 @@ adb shell bmgr backupnow <your.package.name>
 adb uninstall <your.package.name>
 flutter run   # values are restored on install
 ```
+
+`backupnow` should end with `Backup finished with result: Success`. If it says `Backup is not allowed`, Android skipped the app because it is in the "stopped" state: it was force-stopped (the IDE's stop button does this) or hasn't been opened since it was installed. Open the app on the device and run `backupnow` again.
+
+To test without a Google account, switch to the local backup transport first. It keeps backups on the device, so they survive an uninstall but not a wipe:
+
+```sh
+adb shell bmgr list transports    # the active one is marked with *
+adb shell bmgr transport com.android.localtransport/.LocalTransport
+```
+
+Switch back to `com.google.android.gms/.backup.BackupTransportService` when you're done.
 
 ## Usage
 
@@ -184,7 +195,7 @@ if (!prefs.containsKey('migrated')) {
 
 **Values don't come back on iOS.** Check that the iCloud capability with Key-value storage is enabled, that the device is signed into iCloud, and listen to `onRestored`, since values can arrive after launch.
 
-**Values don't come back on Android.** Check that backup is on in the device settings and that `allowBackup` is not `false`. If the app has custom backup rules, include `flutter_cloud_preferences.xml`. Use the `bmgr` commands above to force a backup.
+**Values don't come back on Android.** Check that backup is on in the device settings and that `allowBackup` is not `false`. If the app has custom backup rules, include `flutter_cloud_preferences.xml`. Use the `bmgr` commands above to force a backup; if `backupnow` reports `Backup is not allowed`, open the app first, because Android won't back up an app that was force-stopped.
 
 **The macOS app quits at launch.** The app has the iCloud entitlement without a matching provisioning profile. Let Xcode manage signing with your team.
 
