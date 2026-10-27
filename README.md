@@ -198,6 +198,15 @@ Issues and pull requests are welcome on [GitHub](https://github.com/nvanderwaal/
 dart run pigeon --input pigeons/messages.dart
 ```
 
+### Releasing
+
+Releases are published to pub.dev from GitHub Actions. Bump `version` in `pubspec.yaml`, add the matching entry to `CHANGELOG.md`, merge to `main`, then push a tag for that version:
+
+```sh
+git tag v0.1.1
+git push origin v0.1.1
+```
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
