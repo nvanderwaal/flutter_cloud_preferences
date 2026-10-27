@@ -20,7 +20,7 @@ final darkMode = prefs.getBool('darkMode') ?? false;
 | Local store | `UserDefaults` | A `SharedPreferences` file |
 | Backed up to | iCloud key-value storage, on every write | Android Auto Backup, about once a day |
 | Restored | In the background on the first launch after an install | Before the app first starts after an install |
-| Live sync between running devices | Opt-in (`liveSync: true`) | Not available |
+| Live sync between running devices | Opt-in (`configure(liveSync: true)`) | Not available |
 | Minimum version | iOS 15, macOS 12 | Android 7 (API 24) |
 
 The local store is always the source of truth. The cloud copy is only read back on a fresh install or a new device, and a restored value never overwrites one the app has already written or removed. Keys you declare [local-only](#local-only-keys) are never backed up at all.
@@ -136,12 +136,11 @@ If the app is closed before the iCloud data arrives, the restore continues on th
 
 ### Local-only keys
 
-Some values are wrong on another device: auth tokens, device or installation IDs, push tokens, per-device state. Declare those keys once, on the first `getInstance()` call:
+Some values are wrong on another device: auth tokens, device or installation IDs, push tokens, per-device state. Declare those keys once with `configure()`, before the first `getInstance()`:
 
 ```dart
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await CloudPreferences.getInstance(localOnlyKeys: {'authToken', 'deviceId'});
+void main() {
+  CloudPreferences.configure(localOnlyKeys: {'authToken', 'deviceId'});
   runApp(const MyApp());
 }
 
@@ -157,7 +156,7 @@ Local-only keys are read and written like any other key, but their values:
 - are never restored, and ignored by live sync,
 - don't count towards the [limits](#limits).
 
-Later `getInstance()` calls can leave `localOnlyKeys` out; passing a different set throws a `StateError`. If a later version of your app adds a key to the set, its value moves to the local-only store on the next start and is removed from iCloud. Removing a key from the set moves its value back.
+`configure()` has to run before the first `getInstance()`, because that call opens the store; calling it later with other options throws a `StateError`. If a later version of your app adds a key to the set, its value moves to the local-only store on the next start and is removed from iCloud. Removing a key from the set moves its value back.
 
 One exception when adding a key: if the device had never run a version of the app that uses this package's local-only store (0.2.0 or later), the backed-up value may have come from another device, so it is dropped instead of moved. In practice that only affects an app that updates straight from a version with flutter_cloud_preferences 0.1.0.
 
@@ -166,7 +165,8 @@ One exception when adding a key: if the device had never run a version of the ap
 By default, values that another device changes are not applied while your app runs. To keep all devices on the same Apple ID in sync, turn on live sync and listen to `changes`:
 
 ```dart
-final prefs = await CloudPreferences.getInstance(liveSync: true);
+CloudPreferences.configure(liveSync: true); // in main(), before getInstance()
+final prefs = await CloudPreferences.getInstance();
 
 prefs.changes.listen((change) {
   // change.reason: serverChange, initialSync, quotaViolation or accountChange
@@ -175,7 +175,7 @@ prefs.changes.listen((change) {
 });
 ```
 
-Pass `liveSync` on the first `getInstance()` call; later calls can leave it out, and passing a different value throws a `StateError`. On Android the flag is ignored, because Android has no live sync.
+If you also have local-only keys, pass both in one call: `configure(liveSync: true, localOnlyKeys: {...})`. `getInstance(liveSync: true)` from 0.1.0 still works but is deprecated. On Android the flag is ignored, because Android has no live sync.
 
 If the user changes a value on a fresh install before iCloud's first download, that value is kept and written to iCloud once the download arrives, so it is not in that first `changes` event.
 

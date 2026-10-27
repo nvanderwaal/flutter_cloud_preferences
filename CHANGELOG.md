@@ -1,10 +1,11 @@
 ## 0.2.0
 
-* Local-only keys: `getInstance(localOnlyKeys: {...})` keeps values such as
-  auth tokens and device IDs on the device. They are never mirrored to iCloud,
-  never included in Auto Backup or device backups, and never restored.
-* `getInstance()` options only need to be passed on the first call; later calls
-  can leave them out.
+* `CloudPreferences.configure()` sets the store's options once, before the
+  first `getInstance()`.
+* Local-only keys: `configure(localOnlyKeys: {...})` keeps values such as auth
+  tokens and device IDs on the device. They are never mirrored to iCloud, never
+  included in Auto Backup or device backups, and never restored.
+* `getInstance(liveSync:)` is deprecated; use `configure(liveSync: true)`.
 * iOS and macOS: a key the app removes before the background restore arrives
   is no longer brought back by it.
 * iOS and macOS: values written before iCloud's first download are written to

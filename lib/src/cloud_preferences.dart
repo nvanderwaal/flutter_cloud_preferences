@@ -12,8 +12,8 @@ import 'platform.dart';
 /// Values are kept in a local store, which is the source of truth, and every
 /// write is mirrored to the cloud: iCloud key-value storage on iOS and macOS,
 /// Android Auto Backup on Android. The cloud copy is only read back on a fresh
-/// install or a new device. Keys declared in [localOnlyKeys] stay on the
-/// device.
+/// install or a new device. Keys declared local-only with [configure] stay on
+/// the device.
 ///
 /// Reads are synchronous and come from an in-memory cache that is loaded by
 /// [getInstance]. Writes update the cache immediately and complete once the
@@ -34,8 +34,9 @@ class CloudPreferences {
 
   static CloudPreferencesStore _storeOverride = PigeonCloudPreferencesStore();
   static Future<CloudPreferences>? _instance;
-  static bool? _instanceLiveSync;
-  static Set<String>? _instanceLocalOnlyKeys;
+  static bool _configured = false;
+  static bool _liveSync = false;
+  static Set<String> _localOnlyKeys = const {};
 
   final CloudPreferencesStore _store;
   final Map<String, Object> _cache;
@@ -44,17 +45,14 @@ class CloudPreferences {
   final StreamController<CloudPreferencesChange> _changes =
       StreamController.broadcast();
 
-  /// Whether live sync is on. See [getInstance].
+  /// Whether live sync is on. See [configure].
   final bool liveSync;
 
-  /// The keys that are never backed up or synced. See [getInstance].
+  /// The keys that are never backed up or synced. See [configure].
   final Set<String> localOnlyKeys;
 
-  /// Returns the shared instance, loading the local store on the first call.
-  ///
-  /// By default values are only read back from the cloud on a fresh install or
-  /// a new device. On iOS and macOS that restore happens in the background
-  /// after this returns; listen to [onRestored] to refresh the UI.
+  /// Sets up the store. Call it once, before the first [getInstance], usually
+  /// in `main()`. Without it, the defaults below apply.
   ///
   /// With [liveSync] set to true, iOS and macOS also apply values that other
   /// devices on the same iCloud account change while the app runs, and report
@@ -67,37 +65,60 @@ class CloudPreferences {
   /// wrong on another device. If a key is added to or removed from the set in
   /// a later version of the app, its stored value is moved on the next start.
   ///
-  /// Pass the options on the first call, usually in `main()`. Later calls can
-  /// leave them out and get the same instance; passing a different value
-  /// throws a [StateError].
-  static Future<CloudPreferences> getInstance({
-    bool? liveSync,
-    Set<String>? localOnlyKeys,
+  /// ```dart
+  /// void main() {
+  ///   CloudPreferences.configure(localOnlyKeys: {'authToken', 'deviceId'});
+  ///   runApp(const MyApp());
+  /// }
+  /// ```
+  ///
+  /// Throws a [StateError] when called with other values after [getInstance]
+  /// opened the store.
+  static void configure({
+    bool liveSync = false,
+    Set<String> localOnlyKeys = const {},
   }) {
-    if (liveSync != null &&
-        _instanceLiveSync != null &&
-        _instanceLiveSync != liveSync) {
+    if (_instance != null) {
+      if (liveSync == _liveSync && setEquals(localOnlyKeys, _localOnlyKeys)) {
+        return;
+      }
       throw StateError(
-        'CloudPreferences was already opened with liveSync: $_instanceLiveSync.',
+        'CloudPreferences.configure() must be called before the first '
+        'getInstance().',
       );
     }
-    if (localOnlyKeys != null &&
-        _instanceLocalOnlyKeys != null &&
-        !setEquals(_instanceLocalOnlyKeys, localOnlyKeys)) {
-      throw StateError(
-        'CloudPreferences was already opened with localOnlyKeys: '
-        '$_instanceLocalOnlyKeys.',
-      );
+    _configured = true;
+    _liveSync = liveSync;
+    _localOnlyKeys = Set.unmodifiable(localOnlyKeys);
+  }
+
+  /// Returns the shared instance, loading the local store on the first call.
+  ///
+  /// By default values are only read back from the cloud on a fresh install or
+  /// a new device. On iOS and macOS that restore happens in the background
+  /// after this returns; listen to [onRestored] to refresh the UI.
+  ///
+  /// The store uses the options given to [configure]. [liveSync] is kept for
+  /// apps written for 0.1.0; a value that differs from the store's throws a
+  /// [StateError].
+  static Future<CloudPreferences> getInstance({
+    @Deprecated('Use CloudPreferences.configure(liveSync: true) instead.')
+    bool? liveSync,
+  }) {
+    if (liveSync != null && liveSync != _liveSync) {
+      if (_instance != null || _configured) {
+        throw StateError(
+          'CloudPreferences was already set up with liveSync: $_liveSync.',
+        );
+      }
+      _liveSync = liveSync;
     }
-    _instanceLiveSync ??= liveSync ?? false;
-    _instanceLocalOnlyKeys ??= Set.unmodifiable(localOnlyKeys ?? <String>{});
-    return _instance ??= _open(_instanceLiveSync!, _instanceLocalOnlyKeys!)
-        .catchError((Object error) {
-          _instance = null;
-          _instanceLiveSync = null;
-          _instanceLocalOnlyKeys = null;
-          throw error;
-        });
+    return _instance ??= _open(_liveSync, _localOnlyKeys).catchError((
+      Object error,
+    ) {
+      _instance = null;
+      throw error;
+    });
   }
 
   static Future<CloudPreferences> _open(
@@ -136,7 +157,7 @@ class CloudPreferences {
   }
 
   /// Replaces the native store with an in-memory one holding [values], and
-  /// resets the shared instance.
+  /// resets the shared instance and the options given to [configure].
   ///
   /// Call this in tests before [getInstance].
   @visibleForTesting
@@ -144,7 +165,8 @@ class CloudPreferences {
     setMockStore(InMemoryCloudPreferencesStore(values));
   }
 
-  /// Replaces the native store with [store] and resets the shared instance.
+  /// Replaces the native store with [store] and resets the shared instance
+  /// and the options given to [configure].
   ///
   /// Use this in tests that need to simulate a restore or a live change
   /// through [InMemoryCloudPreferencesStore.emit].
@@ -152,8 +174,9 @@ class CloudPreferences {
   static void setMockStore(CloudPreferencesStore store) {
     _storeOverride = store;
     _instance = null;
-    _instanceLiveSync = null;
-    _instanceLocalOnlyKeys = null;
+    _configured = false;
+    _liveSync = false;
+    _localOnlyKeys = const {};
   }
 
   /// Values restored from the cloud after [getInstance] returned.

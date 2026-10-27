@@ -12,7 +12,8 @@ import 'package:integration_test/integration_test.dart';
 /// value back from the native store.
 Future<CloudPreferences> reload({Set<String>? localOnlyKeys}) {
   CloudPreferences.setMockStore(PigeonCloudPreferencesStore());
-  return CloudPreferences.getInstance(localOnlyKeys: localOnlyKeys);
+  CloudPreferences.configure(localOnlyKeys: localOnlyKeys ?? {});
+  return CloudPreferences.getInstance();
 }
 
 void main() {
