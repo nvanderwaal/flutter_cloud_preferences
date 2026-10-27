@@ -2,7 +2,7 @@ name: flutter_cloud_preferences
 description: >-
   Key-value preferences that survive reinstalls and new devices, backed up to
   iCloud key-value storage on iOS and macOS and Android Auto Backup on Android.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/nvanderwaal/flutter_cloud_preferences
 issue_tracker: https://github.com/nvanderwaal/flutter_cloud_preferences/issues
 topics:

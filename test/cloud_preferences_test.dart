@@ -130,6 +130,101 @@ void main() {
         throwsStateError,
       );
     });
+
+    test('later calls can leave out the options', () async {
+      final prefs = await CloudPreferences.getInstance(
+        liveSync: true,
+        localOnlyKeys: {'token'},
+      );
+
+      expect(await CloudPreferences.getInstance(), same(prefs));
+      expect(prefs.liveSync, isTrue);
+      expect(prefs.localOnlyKeys, {'token'});
+    });
+  });
+
+  group('local-only keys', () {
+    test('are passed to the store, empty by default', () async {
+      final prefs = await CloudPreferences.getInstance();
+
+      expect(prefs.localOnlyKeys, isEmpty);
+      expect(store.localOnlyKeys, isEmpty);
+    });
+
+    test('are passed to the store when given', () async {
+      await CloudPreferences.getInstance(localOnlyKeys: {'token', 'deviceId'});
+
+      expect(store.localOnlyKeys, {'token', 'deviceId'});
+    });
+
+    test('throw when they differ from the first call', () async {
+      await CloudPreferences.getInstance(localOnlyKeys: {'token'});
+
+      expect(
+        () => CloudPreferences.getInstance(localOnlyKeys: {'deviceId'}),
+        throwsStateError,
+      );
+      expect(
+        await CloudPreferences.getInstance(localOnlyKeys: {'token'}),
+        isNotNull,
+      );
+    });
+
+    test('are read and written like other keys', () async {
+      final prefs = await CloudPreferences.getInstance(
+        localOnlyKeys: {'token'},
+      );
+
+      await prefs.setString('token', 'secret');
+      expect(prefs.getString('token'), 'secret');
+      expect(store.values['token'], 'secret');
+    });
+
+    test('are not restored or changed by live sync', () async {
+      final prefs = await CloudPreferences.getInstance(
+        liveSync: true,
+        localOnlyKeys: {'token'},
+      );
+      final restored = <CloudPreferencesRestoreEvent>[];
+      final changes = <CloudPreferencesChange>[];
+      prefs.onRestored.listen(restored.add);
+      prefs.changes.listen(changes.add);
+
+      store.emit(
+        StoreChange(
+          reason: StoreChangeReason.restored,
+          keys: ['token'],
+          values: {'token': 'other device'},
+        ),
+      );
+      store.emit(
+        StoreChange(
+          reason: StoreChangeReason.serverChange,
+          keys: ['token'],
+          values: {'token': 'other device'},
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(prefs.containsKey('token'), isFalse);
+      expect(restored, isEmpty);
+      expect(changes, isEmpty);
+    });
+
+    test('do not count towards the iCloud limits', () async {
+      CloudPreferences.setMockInitialValues({
+        for (var i = 0; i < CloudPreferencesLimits.maxKeys; i++) 'key$i': i,
+      });
+      final prefs = await CloudPreferences.getInstance(
+        localOnlyKeys: {'token'},
+      );
+
+      await prefs.setBytes(
+        'token',
+        Uint8List(CloudPreferencesLimits.maxTotalBytes),
+      );
+      expect(prefs.getBytes('token'), hasLength(1 << 20));
+    });
   });
 
   group('limits', () {
@@ -268,8 +363,11 @@ class _SlowStore extends InMemoryCloudPreferencesStore {
   void finishOpening() => _opened.complete();
 
   @override
-  Future<Map<String, Object>> initialize({required bool liveSync}) async {
+  Future<Map<String, Object>> initialize({
+    required bool liveSync,
+    required Set<String> localOnlyKeys,
+  }) async {
     await _opened.future;
-    return super.initialize(liveSync: liveSync);
+    return super.initialize(liveSync: liveSync, localOnlyKeys: localOnlyKeys);
   }
 }

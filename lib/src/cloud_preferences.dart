@@ -12,7 +12,8 @@ import 'platform.dart';
 /// Values are kept in a local store, which is the source of truth, and every
 /// write is mirrored to the cloud: iCloud key-value storage on iOS and macOS,
 /// Android Auto Backup on Android. The cloud copy is only read back on a fresh
-/// install or a new device.
+/// install or a new device. Keys declared in [localOnlyKeys] stay on the
+/// device.
 ///
 /// Reads are synchronous and come from an in-memory cache that is loaded by
 /// [getInstance]. Writes update the cache immediately and complete once the
@@ -24,11 +25,17 @@ import 'platform.dart';
 /// final theme = prefs.getString('theme');
 /// ```
 class CloudPreferences {
-  CloudPreferences._(this._store, this._cache, this.liveSync);
+  CloudPreferences._(
+    this._store,
+    this._cache,
+    this.liveSync,
+    this.localOnlyKeys,
+  );
 
   static CloudPreferencesStore _storeOverride = PigeonCloudPreferencesStore();
   static Future<CloudPreferences>? _instance;
   static bool? _instanceLiveSync;
+  static Set<String>? _instanceLocalOnlyKeys;
 
   final CloudPreferencesStore _store;
   final Map<String, Object> _cache;
@@ -40,6 +47,9 @@ class CloudPreferences {
   /// Whether live sync is on. See [getInstance].
   final bool liveSync;
 
+  /// The keys that are never backed up or synced. See [getInstance].
+  final Set<String> localOnlyKeys;
+
   /// Returns the shared instance, loading the local store on the first call.
   ///
   /// By default values are only read back from the cloud on a fresh install or
@@ -49,25 +59,51 @@ class CloudPreferences {
   /// With [liveSync] set to true, iOS and macOS also apply values that other
   /// devices on the same iCloud account change while the app runs, and report
   /// them on [changes]. Android has no live sync, so the flag has no effect
-  /// there.
+  /// there. Defaults to false.
   ///
-  /// Every call must pass the same [liveSync] value; a different value throws a
-  /// [StateError].
-  static Future<CloudPreferences> getInstance({bool liveSync = false}) {
-    if (_instanceLiveSync != null && _instanceLiveSync != liveSync) {
+  /// Values of [localOnlyKeys] stay on this device: they are not mirrored to
+  /// iCloud, not included in Auto Backup or device backups, and never
+  /// restored. Use them for auth tokens, device IDs and other values that are
+  /// wrong on another device. If a key is added to or removed from the set in
+  /// a later version of the app, its stored value is moved on the next start.
+  ///
+  /// Pass the options on the first call, usually in `main()`. Later calls can
+  /// leave them out and get the same instance; passing a different value
+  /// throws a [StateError].
+  static Future<CloudPreferences> getInstance({
+    bool? liveSync,
+    Set<String>? localOnlyKeys,
+  }) {
+    if (liveSync != null &&
+        _instanceLiveSync != null &&
+        _instanceLiveSync != liveSync) {
       throw StateError(
         'CloudPreferences was already opened with liveSync: $_instanceLiveSync.',
       );
     }
-    _instanceLiveSync = liveSync;
-    return _instance ??= _open(liveSync).catchError((Object error) {
-      _instance = null;
-      _instanceLiveSync = null;
-      throw error;
-    });
+    if (localOnlyKeys != null &&
+        _instanceLocalOnlyKeys != null &&
+        !setEquals(_instanceLocalOnlyKeys, localOnlyKeys)) {
+      throw StateError(
+        'CloudPreferences was already opened with localOnlyKeys: '
+        '$_instanceLocalOnlyKeys.',
+      );
+    }
+    _instanceLiveSync ??= liveSync ?? false;
+    _instanceLocalOnlyKeys ??= Set.unmodifiable(localOnlyKeys ?? <String>{});
+    return _instance ??= _open(_instanceLiveSync!, _instanceLocalOnlyKeys!)
+        .catchError((Object error) {
+          _instance = null;
+          _instanceLiveSync = null;
+          _instanceLocalOnlyKeys = null;
+          throw error;
+        });
   }
 
-  static Future<CloudPreferences> _open(bool liveSync) async {
+  static Future<CloudPreferences> _open(
+    bool liveSync,
+    Set<String> localOnlyKeys,
+  ) async {
     if (liveSync &&
         !kIsWeb &&
         defaultTargetPlatform == TargetPlatform.android) {
@@ -85,8 +121,16 @@ class CloudPreferences {
       onError: (Object error, StackTrace stackTrace) =>
           prefs?._changes.addError(error, stackTrace),
     );
-    final values = await store.initialize(liveSync: liveSync);
-    prefs = CloudPreferences._(store, _normalize(values), liveSync);
+    final values = await store.initialize(
+      liveSync: liveSync,
+      localOnlyKeys: localOnlyKeys,
+    );
+    prefs = CloudPreferences._(
+      store,
+      _normalize(values),
+      liveSync,
+      localOnlyKeys,
+    );
     pending.forEach(prefs._apply);
     return prefs;
   }
@@ -109,6 +153,7 @@ class CloudPreferences {
     _storeOverride = store;
     _instance = null;
     _instanceLiveSync = null;
+    _instanceLocalOnlyKeys = null;
   }
 
   /// Values restored from the cloud after [getInstance] returned.
@@ -197,6 +242,8 @@ class CloudPreferences {
   }
 
   void _checkLimits(String key, Object value) {
+    // Local-only values never reach iCloud, so its limits don't apply.
+    if (localOnlyKeys.contains(key)) return;
     if (utf8Length(key) > CloudPreferencesLimits.maxKeyBytes) {
       throw CloudPreferencesLimitException(
         key,
@@ -204,14 +251,17 @@ class CloudPreferences {
       );
     }
     final existing = _cache[key];
-    if (existing == null && _cache.length >= CloudPreferencesLimits.maxKeys) {
+    final synced = _cache.keys.where((k) => !localOnlyKeys.contains(k));
+    if (existing == null && synced.length >= CloudPreferencesLimits.maxKeys) {
       throw CloudPreferencesLimitException(
         key,
         'At most ${CloudPreferencesLimits.maxKeys} keys can be stored.',
       );
     }
     var total = 0;
-    _cache.forEach((k, v) => total += storedSize(k, v));
+    for (final k in synced) {
+      total += storedSize(k, _cache[k]!);
+    }
     if (existing != null) total -= storedSize(key, existing);
     if (total + storedSize(key, value) > CloudPreferencesLimits.maxTotalBytes) {
       throw CloudPreferencesLimitException(
@@ -223,10 +273,11 @@ class CloudPreferences {
 
   void _apply(StoreChange change) {
     final values = _normalize(change.values);
+    final keys = change.keys.where((key) => !localOnlyKeys.contains(key));
     if (change.reason == StoreChangeReason.restored) {
       // A restore never overwrites a value the app has written.
       final restored = <String>{};
-      for (final key in change.keys) {
+      for (final key in keys) {
         final value = values[key];
         if (value != null && !_cache.containsKey(key)) {
           _cache[key] = value;
@@ -238,7 +289,8 @@ class CloudPreferences {
       }
       return;
     }
-    for (final key in change.keys) {
+    if (keys.isEmpty) return;
+    for (final key in keys) {
       final value = values[key];
       if (value == null) {
         _cache.remove(key);
@@ -247,7 +299,7 @@ class CloudPreferences {
       }
     }
     _changes.add(
-      CloudPreferencesChange(_reasons[change.reason]!, Set.of(change.keys)),
+      CloudPreferencesChange(_reasons[change.reason]!, Set.of(keys)),
     );
   }
 

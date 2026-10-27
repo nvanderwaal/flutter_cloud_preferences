@@ -23,9 +23,9 @@ final darkMode = prefs.getBool('darkMode') ?? false;
 | Live sync between running devices | Opt-in (`liveSync: true`) | Not available |
 | Minimum version | iOS 15, macOS 12 | Android 7 (API 24) |
 
-The local store is always the source of truth. The cloud copy is only read back on a fresh install or a new device, and a restored value never overwrites one the app has already written.
+The local store is always the source of truth. The cloud copy is only read back on a fresh install or a new device, and a restored value never overwrites one the app has already written or removed. Keys you declare [local-only](#local-only-keys) are never backed up at all.
 
-Use it for small things a user would expect to keep: settings, onboarding flags, a selected theme. Do **not** store secrets or tokens (values are not encrypted on the device; use [`flutter_secure_storage`](https://pub.dev/packages/flutter_secure_storage)), and do not use it as a database (see [Limits](#limits)).
+Use it for small things a user would expect to keep: settings, onboarding flags, a selected theme. Do **not** store secrets (values are not encrypted on the device; use [`flutter_secure_storage`](https://pub.dev/packages/flutter_secure_storage)), and do not use it as a database (see [Limits](#limits)).
 
 ## Installation
 
@@ -130,6 +130,37 @@ prefs.onRestored.listen((event) {
 });
 ```
 
+**What the app writes first wins.** If the user changes a setting before the iCloud data arrives, the restore leaves that key alone: the new value stays, locally and in iCloud. The same goes for a key the app removes, or everything it removes with `clear()`. `onRestored` only lists keys that actually received a restored value, so a key the app had already written is never in `event.keys`, and no event is sent when nothing was restored.
+
+If the app is closed before the iCloud data arrives, the restore continues on the next launch. Values that arrived in the meantime are already loaded when `getInstance()` returns.
+
+### Local-only keys
+
+Some values are wrong on another device: auth tokens, device or installation IDs, push tokens, per-device state. Declare those keys once, on the first `getInstance()` call:
+
+```dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await CloudPreferences.getInstance(localOnlyKeys: {'authToken', 'deviceId'});
+  runApp(const MyApp());
+}
+
+// Anywhere else in the app:
+final prefs = await CloudPreferences.getInstance();
+await prefs.setString('deviceId', id); // stays on this device
+```
+
+Local-only keys are read and written like any other key, but their values:
+
+- are never mirrored to iCloud and never included in Android Auto Backup,
+- are kept out of device backups and device-to-device transfers too (a file excluded from backup on iOS and macOS, `noBackupFilesDir` on Android),
+- are never restored, and ignored by live sync,
+- don't count towards the [limits](#limits).
+
+Later `getInstance()` calls can leave `localOnlyKeys` out; passing a different set throws a `StateError`. If a later version of your app adds a key to the set, its value moves to the local-only store on the next start and is removed from iCloud. Removing a key from the set moves its value back.
+
+One exception when adding a key: if the device had never run a version of the app that uses this package's local-only store (0.2.0 or later), the backed-up value may have come from another device, so it is dropped instead of moved. In practice that only affects an app that updates straight from a version with flutter_cloud_preferences 0.1.0.
+
 ### Live sync (iOS and macOS only)
 
 By default, values that another device changes are not applied while your app runs. To keep all devices on the same Apple ID in sync, turn on live sync and listen to `changes`:
@@ -144,7 +175,9 @@ prefs.changes.listen((change) {
 });
 ```
 
-Every `getInstance()` call in the app must use the same `liveSync` value. On Android the flag is ignored, because Android has no live sync.
+Pass `liveSync` on the first `getInstance()` call; later calls can leave it out, and passing a different value throws a `StateError`. On Android the flag is ignored, because Android has no live sync.
+
+If the user changes a value on a fresh install before iCloud's first download, that value is kept and written to iCloud once the download arrives, so it is not in that first `changes` event.
 
 ## Limits
 
@@ -156,7 +189,7 @@ These are the limits of iCloud key-value storage. The package applies them on ev
 | Number of keys | 1024 |
 | Total size of keys and values | 1 MB |
 
-A write that breaks a limit throws a `CloudPreferencesLimitException` and stores nothing. Supported value types are `String`, `bool`, `int`, `double`, `List<String>` and `Uint8List`. To store a map, `jsonEncode` it into a string.
+[Local-only keys](#local-only-keys) don't count towards these limits. A write that breaks a limit throws a `CloudPreferencesLimitException` and stores nothing. Supported value types are `String`, `bool`, `int`, `double`, `List<String>` and `Uint8List`. To store a map, `jsonEncode` it into a string.
 
 ## Testing
 

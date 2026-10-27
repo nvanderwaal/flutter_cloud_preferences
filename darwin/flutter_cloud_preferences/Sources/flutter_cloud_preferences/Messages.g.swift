@@ -303,8 +303,12 @@ protocol CloudPreferencesHostApi {
   /// With [liveSync] false, cloud values are only read back on a fresh
   /// install. With [liveSync] true (Apple platforms only), external changes
   /// are applied and reported as they arrive.
-  func initialize(liveSync: Bool) throws -> [String: Any]
-  /// Stores [value] locally and mirrors it to the cloud.
+  ///
+  /// Keys in [localOnlyKeys] are kept in a separate store that is never backed
+  /// up or synced. Stored values are moved between the stores to match.
+  func initialize(liveSync: Bool, localOnlyKeys: [String]) throws -> [String: Any]
+  /// Stores [value] locally and, unless [key] is local-only, mirrors it to the
+  /// cloud.
   func setValue(key: String, value: Any) throws
   /// Removes [key] locally and from the cloud.
   func remove(key: String) throws
@@ -323,13 +327,17 @@ class CloudPreferencesHostApiSetup {
     /// With [liveSync] false, cloud values are only read back on a fresh
     /// install. With [liveSync] true (Apple platforms only), external changes
     /// are applied and reported as they arrive.
+    ///
+    /// Keys in [localOnlyKeys] are kept in a separate store that is never backed
+    /// up or synced. Stored values are moved between the stores to match.
     let initializeChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_cloud_preferences.CloudPreferencesHostApi.initialize\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       initializeChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let liveSyncArg = args[0] as! Bool
+        let localOnlyKeysArg = args[1] as! [String]
         do {
-          let result = try api.initialize(liveSync: liveSyncArg)
+          let result = try api.initialize(liveSync: liveSyncArg, localOnlyKeys: localOnlyKeysArg)
           reply(wrapResult(result))
         } catch {
           reply(wrapError(error))
@@ -338,7 +346,8 @@ class CloudPreferencesHostApiSetup {
     } else {
       initializeChannel.setMessageHandler(nil)
     }
-    /// Stores [value] locally and mirrors it to the cloud.
+    /// Stores [value] locally and, unless [key] is local-only, mirrors it to the
+    /// cloud.
     let setValueChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_cloud_preferences.CloudPreferencesHostApi.setValue\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       setValueChannel.setMessageHandler { message, reply in

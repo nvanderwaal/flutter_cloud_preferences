@@ -21,8 +21,8 @@ public class FlutterCloudPreferencesPlugin: NSObject, FlutterPlugin, CloudPrefer
     WatchChangesStreamHandler.register(with: messenger, streamHandler: plugin.changes)
   }
 
-  func initialize(liveSync: Bool) throws -> [String: Any] {
-    return ValueCoding.toDart(store.open(liveSync: liveSync))
+  func initialize(liveSync: Bool, localOnlyKeys: [String]) throws -> [String: Any] {
+    return ValueCoding.toDart(store.open(liveSync: liveSync, localOnlyKeys: Set(localOnlyKeys)))
   }
 
   func setValue(key: String, value: Any) throws {

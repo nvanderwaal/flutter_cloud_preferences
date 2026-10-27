@@ -56,9 +56,13 @@ abstract class CloudPreferencesHostApi {
   /// With [liveSync] false, cloud values are only read back on a fresh
   /// install. With [liveSync] true (Apple platforms only), external changes
   /// are applied and reported as they arrive.
-  Map<String, Object> initialize(bool liveSync);
+  ///
+  /// Keys in [localOnlyKeys] are kept in a separate store that is never backed
+  /// up or synced. Stored values are moved between the stores to match.
+  Map<String, Object> initialize(bool liveSync, List<String> localOnlyKeys);
 
-  /// Stores [value] locally and mirrors it to the cloud.
+  /// Stores [value] locally and, unless [key] is local-only, mirrors it to the
+  /// cloud.
   void setValue(String key, Object value);
 
   /// Removes [key] locally and from the cloud.
