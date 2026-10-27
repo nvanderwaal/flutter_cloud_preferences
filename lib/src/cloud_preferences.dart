@@ -99,10 +99,14 @@ class CloudPreferences {
   /// after this returns; listen to [onRestored] to refresh the UI.
   ///
   /// The store uses the options given to [configure]. [liveSync] is kept for
-  /// apps written for 0.1.0; a value that differs from the store's throws a
-  /// [StateError].
+  /// apps written for 0.1.0 and will be removed in 1.0; a value that differs
+  /// from the store's throws a [StateError].
   static Future<CloudPreferences> getInstance({
-    @Deprecated('Use CloudPreferences.configure(liveSync: true) instead.')
+    // TODO: remove liveSync before the 1.0 release.
+    @Deprecated(
+      'Use CloudPreferences.configure(liveSync: true) instead. '
+      'This parameter will be removed in 1.0.',
+    )
     bool? liveSync,
   }) {
     if (liveSync != null && liveSync != _liveSync) {

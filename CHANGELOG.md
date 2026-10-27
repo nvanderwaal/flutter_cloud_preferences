@@ -5,7 +5,8 @@
 * Local-only keys: `configure(localOnlyKeys: {...})` keeps values such as auth
   tokens and device IDs on the device. They are never mirrored to iCloud, never
   included in Auto Backup or device backups, and never restored.
-* `getInstance(liveSync:)` is deprecated; use `configure(liveSync: true)`.
+* `getInstance(liveSync:)` is deprecated and will be removed in 1.0; use
+  `configure(liveSync: true)`.
 * iOS and macOS: a key the app removes before the background restore arrives
   is no longer brought back by it.
 * iOS and macOS: values written before iCloud's first download are written to

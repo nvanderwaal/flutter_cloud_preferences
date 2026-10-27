@@ -175,7 +175,7 @@ prefs.changes.listen((change) {
 });
 ```
 
-If you also have local-only keys, pass both in one call: `configure(liveSync: true, localOnlyKeys: {...})`. `getInstance(liveSync: true)` from 0.1.0 still works but is deprecated. On Android the flag is ignored, because Android has no live sync.
+If you also have local-only keys, pass both in one call: `configure(liveSync: true, localOnlyKeys: {...})`. `getInstance(liveSync: true)` from 0.1.0 still works but is deprecated and will be removed in 1.0. On Android the flag is ignored, because Android has no live sync.
 
 If the user changes a value on a fresh install before iCloud's first download, that value is kept and written to iCloud once the download arrives, so it is not in that first `changes` event.
 
