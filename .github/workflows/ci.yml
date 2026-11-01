@@ -72,10 +72,26 @@ jobs:
       - name: Integration tests on the iOS simulator
         working-directory: example
         run: |
+          # Use an iPhone from the newest iOS runtime installed on the runner.
           UDID=$(xcrun simctl list devices available --json | python3 -c "
-          import json, sys
+          import json, re, sys
           devices = json.load(sys.stdin)['devices']
-          print(next(d['udid'] for runtime, ds in devices.items() if 'iOS' in runtime for d in ds if d['name'].startswith('iPhone')))
+          def version(runtime):
+              return [int(n) for n in re.findall(r'\d+', runtime.split('iOS')[-1])]
+          ios = sorted((r for r in devices if 'iOS' in r), key=version, reverse=True)
+          print(next(d['udid'] for r in ios for d in devices[r] if d['name'].startswith('iPhone')))
           ")
-          xcrun simctl bootstatus "$UDID" -b
+          # bootstatus can end in an error state while still exiting 0, which
+          # left flutter test waiting on an app that never started. Check the
+          # device really booted, and erase and retry once if it didn't.
+          booted() { xcrun simctl list devices | grep "$UDID" | grep -q "(Booted)"; }
+          for attempt in 1 2; do
+            xcrun simctl boot "$UDID" || true
+            xcrun simctl bootstatus "$UDID" -b || true
+            booted && break
+            echo "Simulator $UDID did not boot (attempt $attempt)"
+            xcrun simctl shutdown "$UDID" || true
+            xcrun simctl erase "$UDID"
+          done
+          booted
           flutter test integration_test -d "$UDID"
