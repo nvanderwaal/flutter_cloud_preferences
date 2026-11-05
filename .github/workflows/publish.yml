@@ -12,7 +12,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # setup-dart configures the OIDC token that pub.dev uses to authenticate
       # the publish; flutter-action then provides the Flutter SDK.
       - uses: dart-lang/setup-dart@v1
