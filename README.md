@@ -3,6 +3,9 @@
 [![pub package](https://img.shields.io/pub/v/flutter_cloud_preferences.svg)](https://pub.dev/packages/flutter_cloud_preferences)
 [![CI](https://github.com/nvanderwaal/flutter_cloud_preferences/actions/workflows/ci.yml/badge.svg)](https://github.com/nvanderwaal/flutter_cloud_preferences/actions/workflows/ci.yml)
 
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/nvanderwaal)
+
 Key-value preferences that survive reinstalls and new devices.
 
 Values are saved locally and backed up to the platform's cloud: **iCloud key-value storage** on iOS and macOS, **Android Auto Backup** on Android. When the app is reinstalled or set up on a new device, the values come back. The API works like [`shared_preferences`](https://pub.dev/packages/shared_preferences): load once, then read synchronously.
