@@ -1,3 +1,11 @@
+## 0.3.0
+
+* Compatible with Flutter 3.50.
+* Android: built with Android Gradle Plugin 9.3.1 and Kotlin 2.4.20.
+* Platform bindings regenerated with Pigeon 30. No API changes.
+* The example app uses the standalone `material_ui` package and requires
+  Flutter 3.47 or later. The package's own SDK constraints are unchanged.
+
 ## 0.2.0
 
 * `CloudPreferences.configure()` sets the store's options once, before the
