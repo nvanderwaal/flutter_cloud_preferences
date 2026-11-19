@@ -38,6 +38,16 @@ flutter pub add flutter_cloud_preferences
 
 Then set up each platform below. Without the setup, the package still works, but values are only stored locally.
 
+### Flutter compatibility
+
+| flutter_cloud_preferences | Tested with Flutter | Minimum Flutter |
+| --- | --- | --- |
+| 0.3.x | 3.50 | 3.35 |
+| 0.2.x | 3.47 | 3.35 |
+| 0.1.x | not tested in CI | 3.35 |
+
+"Tested with" is the Flutter stable release CI ran the integration tests on (Android emulator, iOS simulator and macOS) for that version. On Flutter 3.50 or later, use 0.3.0 or later. The minimum is what the package's `pubspec.yaml` allows; versions between the minimum and the tested one aren't covered by CI.
+
 ### iOS and macOS
 
 iCloud key-value storage needs the iCloud capability, which needs a paid Apple Developer Program membership.

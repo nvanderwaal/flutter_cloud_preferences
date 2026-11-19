@@ -5,6 +5,8 @@
 * Platform bindings regenerated with Pigeon 30. No API changes.
 * The example app uses the standalone `material_ui` package and requires
   Flutter 3.47 or later. The package's own SDK constraints are unchanged.
+* README: a table of which package version is tested with which Flutter
+  version.
 
 ## 0.2.0
 
