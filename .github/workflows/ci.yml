@@ -71,6 +71,7 @@ jobs:
         working-directory: example
       - name: Integration tests on the iOS simulator
         working-directory: example
+        timeout-minutes: 35
         run: |
           # Use an iPhone from the newest iOS runtime installed on the runner.
           UDID=$(xcrun simctl list devices available --json | python3 -c "
@@ -94,7 +95,26 @@ jobs:
             xcrun simctl erase "$UDID"
           done
           booted
-          # flutter test prints nothing while Xcode builds for the simulator
-          # (several minutes on the runner), so say so rather than look stuck.
-          echo "Simulator booted. Building the app for it and running the tests..."
-          flutter test integration_test -d "$UDID"
+          # flutter test sometimes hangs after "Xcode build done" without
+          # ever starting the tests. Give each attempt a time limit, keep a
+          # verbose log to see where it stopped, and retry once on a freshly
+          # booted simulator.
+          for attempt in 1 2; do
+            # flutter test prints nothing while Xcode builds for the simulator
+            # (several minutes on the runner), so say so rather than look stuck.
+            echo "Simulator booted. Building the app for it and running the tests (attempt $attempt)..."
+            status=0
+            # macOS has no timeout(1); perl's alarm ends the run after 12 minutes.
+            perl -e 'alarm shift; exec @ARGV' 720 \
+              flutter test integration_test -d "$UDID" -v > "flutter-test-$attempt.log" 2>&1 || status=$?
+            grep -E '^\s*(✅|❌|🎉|[0-9]+ tests? (passed|failed))|Some tests failed|Test failed' "flutter-test-$attempt.log" || true
+            [ "$status" -eq 0 ] && exit 0
+            echo "::warning::iOS integration tests attempt $attempt ended with status $status. Last lines of the verbose log:"
+            tail -n 150 "flutter-test-$attempt.log"
+            # 142 is SIGALRM: the run hung. Any other failure is a real one.
+            [ "$status" -eq 142 ] || exit "$status"
+            xcrun simctl shutdown "$UDID" || true
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID"
+          done
+          exit 1
