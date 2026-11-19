@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_cloud_preferences/flutter_cloud_preferences.dart';
+import 'package:material_ui/material_ui.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
