@@ -59,6 +59,22 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      - name: Start booting the iOS simulator
+        # A fresh simulator spends ~7 minutes on first boot ("Waiting on
+        # System App"). Start it now so it boots while the builds and macOS
+        # tests run, instead of at the start of the iOS test step.
+        run: |
+          # Use an iPhone from the newest iOS runtime installed on the runner.
+          UDID=$(xcrun simctl list devices available --json | python3 -c "
+          import json, re, sys
+          devices = json.load(sys.stdin)['devices']
+          def version(runtime):
+              return [int(n) for n in re.findall(r'\d+', runtime.split('iOS')[-1])]
+          ios = sorted((r for r in devices if 'iOS' in r), key=version, reverse=True)
+          print(next(d['udid'] for r in ios for d in devices[r] if d['name'].startswith('iPhone')))
+          ")
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -72,15 +88,7 @@ jobs:
       - name: Integration tests on the iOS simulator
         working-directory: example
         run: |
-          # Use an iPhone from the newest iOS runtime installed on the runner.
-          UDID=$(xcrun simctl list devices available --json | python3 -c "
-          import json, re, sys
-          devices = json.load(sys.stdin)['devices']
-          def version(runtime):
-              return [int(n) for n in re.findall(r'\d+', runtime.split('iOS')[-1])]
-          ios = sorted((r for r in devices if 'iOS' in r), key=version, reverse=True)
-          print(next(d['udid'] for r in ios for d in devices[r] if d['name'].startswith('iPhone')))
-          ")
+          UDID="$SIMULATOR_UDID"
           # bootstatus can end in an error state while still exiting 0, which
           # left flutter test waiting on an app that never started. Check the
           # device really booted, and erase and retry once if it didn't.
@@ -94,4 +102,7 @@ jobs:
             xcrun simctl erase "$UDID"
           done
           booted
+          # flutter test prints nothing while Xcode builds for the simulator
+          # (about 3 minutes), so say so rather than look stuck.
+          echo "Simulator booted. Building the app for it and running the tests..."
           flutter test integration_test -d "$UDID"
