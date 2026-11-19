@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://pub.dev/packages/flutter_cloud_preferences
+    about: Setup and usage docs for flutter_cloud_preferences.

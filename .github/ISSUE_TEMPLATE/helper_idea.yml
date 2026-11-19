@@ -1,0 +1,48 @@
+name: Helper idea
+description: Suggest a new helper, feature, or improvement to the API.
+title: "[Idea]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea that would make flutter_cloud_preferences easier to use? Tell us about it.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the use case or the problem you're running into today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would the helper or feature look like? A sketch of the API you'd like to call is great.
+      render: dart
+      placeholder: |
+        final prefs = await CloudPreferences.getInstance();
+        await prefs.setJson('settings', {'theme': 'dark'});
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds or alternatives
+      description: How are you handling this now, and did you consider other approaches?
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Platforms it matters for
+      multiple: true
+      options:
+        - iOS
+        - Android
+        - macOS
+        - All
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd be willing to open a pull request for this.

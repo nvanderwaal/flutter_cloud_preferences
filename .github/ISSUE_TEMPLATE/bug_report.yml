@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in flutter_cloud_preferences doesn't work as expected.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please check the [open issues](https://github.com/nvanderwaal/flutter_cloud_preferences/issues) first to see if it's already been reported.
+  - type: textarea
+    id: what-broke
+    attributes:
+      label: What broke?
+      description: What did you do, what did you expect to happen, and what happened instead? Steps to reproduce help a lot.
+      placeholder: |
+        1. Call `CloudPreferences.getInstance()` ...
+        2. Write a value with `setString('theme', 'dark')`
+        3. Reinstall the app
+        Expected: ...
+        Actual: ...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Which platforms does this happen on?
+      multiple: true
+      options:
+        - iOS
+        - Android
+        - macOS
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: device-os
+    attributes:
+      label: Device / OS version (and browser, if relevant)
+      description: For example "iPhone 15, iOS 18.1", "Pixel 8 emulator, Android 15", or "macOS 15.1".
+    validations:
+      required: true
+  - type: input
+    id: package-version
+    attributes:
+      label: Package version
+      description: The flutter_cloud_preferences version from your `pubspec.lock`.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: textarea
+    id: flutter-version
+    attributes:
+      label: Flutter version
+      description: Paste the output of `flutter --version`.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshots or logs
+      description: Drag in a screenshot or screen recording, or paste relevant logs or a stack trace.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Your `configure()` options (for example `liveSync` or `localOnlyKeys`), iCloud / Auto Backup setup, or anything else that might help.
