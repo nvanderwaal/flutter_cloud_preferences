@@ -94,4 +94,7 @@ jobs:
             xcrun simctl erase "$UDID"
           done
           booted
+          # flutter test prints nothing while Xcode builds for the simulator
+          # (several minutes on the runner), so say so rather than look stuck.
+          echo "Simulator booted. Building the app for it and running the tests..."
           flutter test integration_test -d "$UDID"
